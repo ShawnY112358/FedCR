@@ -20,7 +20,7 @@ class avg_Server():
         self.test_set = load_dataset(name=conf.dataset, is_train=False)
         self.test_loader = torch.utils.data.DataLoader(self.test_set, batch_size=conf.batchsize, shuffle=False)
 
-        self.prototype = torch.rand([conf.num_classes, conf.prototype_size])
+        self.prototype = [torch.rand([conf.prototype_size]) for c in range(conf.num_classes)]
         self.test_acc = []
 
     def init_client_info(self, clients):
@@ -89,13 +89,14 @@ class avg_Server():
         pass
 
     def aggregate(self, group):
-        prototype = torch.zeros_like(self.prototype)
         for c in range(conf.num_classes):
+            prototype = torch.zeros_like(self.prototype[0])
             N = 0
-            for client in self.clients:
-                prototype[c] += client.feature[c] * client.class_count[c]
+            for client in group:
+                if client.class_count[c] != 0:
+                    prototype += client.feature[c] * client.class_count[c]
                 N += client.class_count[c]
-            self.prototype[c] = prototype[c] / N
+            self.prototype[c] = prototype / N
 
         for key in self.extractor.state_dict().keys():
             if 'num_batches_tracked' in key:

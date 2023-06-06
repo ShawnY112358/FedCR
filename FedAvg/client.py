@@ -63,17 +63,18 @@ class avg_Client():
                 x = self.extractor(x)
                 loss_e = criterion_e(x, prototype)
                 output = self.classifier(x)
-                loss = criterion(output, y) + self.sigma * loss_e
+                loss_c = criterion(output, y)
+                loss = loss_c + self.sigma * loss_e
                 loss.backward()
                 optimizer_e.step()
                 optimizer_c.step()
 
-                avg_loss += loss.cpu().item()
+                avg_loss += loss_c.cpu().item()
                 avg_loss_e += loss_e.cpu().item()
 
             avg_loss /= int(len(self.train_data)/self.batch_size)
-            print("client: %d\t epoch: (%d/%d)\t loss: %f \t loss_c: %f"
-                  % (self.index, l_epoch, self.num_l_epochs, avg_loss, avg_loss - avg_loss_e * self.sigma))
+            print("client: %d\t epoch: (%d/%d)\t loss_e: %f \t loss_c: %f"
+                  % (self.index, l_epoch, self.num_l_epochs, avg_loss_e, avg_loss))
             self.loss_avg.append(avg_loss)
 
         feature = []
@@ -90,8 +91,11 @@ class avg_Client():
                         f += output[j]
                         count += 1
                 self.class_count[i] = count
-                feature.append((f / count).numpy())
-        self.feature = torch.tensor(feature)
+                if count != 0:
+                    feature.append(f / count)
+                else:
+                    feature.append(None)
+        self.feature = feature
 
     def finetune(self):
         print("FedAvg with fine-tune:")
@@ -136,6 +140,7 @@ class avg_Client():
     def down_model(self):
 
         self.prototype = self.server.prototype
+
         for key in self.extractor.state_dict().keys():
             self.extractor.state_dict()[key].data.copy_(self.server.extractor.state_dict()[key])
 
